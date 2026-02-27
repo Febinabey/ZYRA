@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+from datetime import datetime
+import math
+
 import pandas as pd
 import streamlit as st
 try:
@@ -99,18 +102,18 @@ def _inject_theme() -> None:
             .stApp { background: radial-gradient(900px 300px at -10% -10%, rgba(20,184,166,.18), transparent 58%), radial-gradient(700px 250px at 110% -10%, rgba(99,102,241,.15), transparent 56%), linear-gradient(180deg,#0b1020 0%,#0b1124 100%); }
             [data-testid="stSidebar"] { background: linear-gradient(180deg,#0e1629 0%,#0c1424 100%); border-right:1px solid #23304a; }
             [data-testid="stSidebar"] * { color:#e2e8f0 !important; }
-            .topbar { border:1px solid #23304a; border-radius:14px; padding:.8rem 1rem; margin-bottom:1rem; background:rgba(16,24,39,.88); display:flex; justify-content:space-between; align-items:center; }
+            .topbar { border:1px solid #23304a; border-radius:14px; padding:.8rem 1rem; margin-bottom:1.15rem; background:rgba(16,24,39,.88); display:flex; justify-content:space-between; align-items:center; }
             .topbar-title { font-weight:800; font-size:1rem; }
             .topbar-tag { color:#93a4bd; font-size:.82rem; font-weight:600; }
-            .section-title { font-size:1.04rem; font-weight:800; margin-bottom:.2rem; }
-            .section-subtitle { color:#93a4bd; font-size:.84rem; margin-bottom:.8rem; }
-            .divider { height:1px; width:100%; background:#23304a; margin:.55rem 0 .9rem 0; }
-            .card { border:1px solid #23304a; border-radius:14px; padding:.85rem .9rem; background:linear-gradient(180deg,#111a2d 0%,#0f1727 100%); transition:all .22s ease; }
+            .section-title { font-size:1.04rem; font-weight:800; margin-bottom:.24rem; }
+            .section-subtitle { color:#93a4bd; font-size:.84rem; margin-bottom:.72rem; line-height:1.45; }
+            .divider { height:1px; width:100%; background:#23304a; margin:.5rem 0 .88rem 0; }
+            .card { border:1px solid #23304a; border-radius:14px; padding:.85rem .9rem; background:linear-gradient(180deg,#111a2d 0%,#0f1727 100%); transition:all .22s ease; min-height:96px; display:flex; flex-direction:column; justify-content:center; }
             .card:hover { border-color:#31405f; transform:translateY(-1px); box-shadow:0 8px 26px rgba(2,10,28,.45); }
             .metric-label { color:#93a4bd; font-size:.75rem; font-weight:700; margin-bottom:.28rem; }
             .metric-value { color:#e2e8f0; font-size:1.28rem; font-weight:800; line-height:1.1; }
             .metric-foot { color:#14b8a6; margin-top:.2rem; font-size:.72rem; font-weight:700; }
-            .recommend-card { border:1px solid #1e3a5f; border-left:4px solid #14b8a6; border-radius:14px; padding:.9rem; background:linear-gradient(135deg,#102438 0%,#0f1b2d 100%); margin-bottom:.8rem; }
+            .recommend-card { border:1px solid #1e3a5f; border-left:4px solid #14b8a6; border-radius:14px; padding:.9rem; background:linear-gradient(135deg,#102438 0%,#0f1b2d 100%); margin-bottom:.85rem; }
             .recommend-title { font-size:.96rem; font-weight:800; margin-bottom:.2rem; }
             .recommend-sub { color:#93a4bd; font-size:.83rem; }
             .status-pill { display:inline-block; border-radius:999px; padding:.18rem .55rem; font-size:.73rem; font-weight:800; border:1px solid; margin-left:.4rem; }
@@ -119,16 +122,19 @@ def _inject_theme() -> None:
             .pill-low { color:#fca5a5; border-color:#7f1d1d; background:rgba(239,68,68,.12); }
             .status-banner { border:1px solid #204f46; background:rgba(20,184,166,.1); color:#99f6e4; border-radius:12px; padding:.7rem .8rem; margin-bottom:.7rem; font-size:.86rem; font-weight:700; }
             .status-banner.warn { border-color:#92400e; background:rgba(245,158,11,.1); color:#fcd34d; }
-            .stTabs [data-baseweb="tab-list"] { gap:.45rem; }
+            .stTabs [data-baseweb="tab-list"] { gap:.45rem; margin-bottom:.55rem; }
             .stTabs [data-baseweb="tab"] { border-radius:10px; border:1px solid #23304a; background:#0f1a2d; color:#93a4bd; font-weight:700; min-height:2.4rem; padding:.28rem .9rem; }
             .stTabs [aria-selected="true"] { background:#12233a; color:#e2e8f0; border-color:#2f4e74; }
             div[data-testid="stMetric"] { border:1px solid #23304a; background:#101827; border-radius:12px; padding:.55rem .7rem; }
             div[data-testid="stDataFrame"] { border:1px solid #23304a; border-radius:12px; overflow:hidden; }
             button[kind="primary"], button[kind="secondary"] { border-radius:10px !important; transition:all .18s ease !important; }
             button[kind="primary"]:hover, button[kind="secondary"]:hover { transform:translateY(-1px); filter:brightness(1.05); }
-            .module-box { border:1px solid #23304a; border-radius:14px; padding:.9rem; background:#101827; margin-bottom:1rem; }
+            .module-box { border:1px solid #23304a; border-radius:14px; padding:1rem; background:#101827; margin-bottom:1rem; }
             .reason-line { border-left:3px solid #14b8a6; padding:.35rem .55rem; margin-bottom:.38rem; border-radius:0 8px 8px 0; background:rgba(20,184,166,.09); color:#c5f4ee; font-size:.82rem; }
             .stProgress > div > div > div > div { background-color:#14b8a6; }
+            [data-testid="column"] > div:has(.card) { height: 100%; }
+            [data-testid="stHorizontalBlock"] { gap: 0.8rem; }
+            .block-container { padding-top: 1.15rem; padding-bottom: 1.2rem; }
         </style>
         """,
         unsafe_allow_html=True,
@@ -192,18 +198,97 @@ def _advisory_card(scheme_name: str, scheme_id: str, reason: str, subsidy: float
 
 
 def _optimization_summary_card(totals: dict[str, float], optimization_summary: dict[str, float]) -> None:
-    status_class = "status-banner" if totals["budget_respected"] else "status-banner warn"
-    status_text = "Budget Status: Constraint satisfied and allocation is policy-aligned." if totals["budget_respected"] else "Budget Status: Constraint violation detected."
-    st.markdown(f'<div class="{status_class}">{status_text}</div>', unsafe_allow_html=True)
-    pct = float(optimization_summary.get("budget_utilization_pct", 0.0))
-    if PLOTLY_AVAILABLE:
-        gauge = go.Figure(go.Indicator(mode="gauge+number", value=pct, number={"suffix": "%", "font": {"color": "#e2e8f0", "size": 26}}, gauge={"axis": {"range": [0, 100], "tickcolor": "#64748b"}, "bar": {"color": ACCENT}, "bgcolor": "#101827", "borderwidth": 0, "steps": [{"range": [0, 55], "color": "#1f2937"}, {"range": [55, 85], "color": "#1f3650"}, {"range": [85, 100], "color": "#123a35"}]}, title={"text": "Budget Utilization", "font": {"color": MUTED, "size": 13}}))
-        gauge.update_layout(height=220, margin=dict(l=8, r=8, t=22, b=8), paper_bgcolor=PANEL, plot_bgcolor=PANEL)
-        st.plotly_chart(gauge, use_container_width=True, config={"displayModeBar": False})
-    else:
-        st.metric("Budget Utilization", f"{pct:.1f}%")
-        st.progress(min(max(pct / 100.0, 0.0), 1.0))
+    allocated = float(totals.get("total_subsidy_allocated", 0.0))
+    budget_limit = float(totals.get("budget_limit", 0.0))
 
+    pct_raw = (allocated / budget_limit * 100) if budget_limit > 0 else 0.0
+    pct_display = round(pct_raw, 2)  # 👈 fixes 100% rounding issue
+    pct_clamped = min(max(pct_display, 0.0), 100.0)
+
+    # ---- Budget Status Check ----
+    is_budget_ok = allocated <= budget_limit + 1e-6
+
+    status_class = "status-banner" if is_budget_ok else "status-banner warn"
+    status_text = (
+        "Budget Status: Constraint satisfied and allocation is policy-aligned."
+        if is_budget_ok
+        else "Budget Status: Constraint violation detected."
+    )
+
+    # ---- Centered Status Banner ----
+    st.markdown(
+        f"""
+        <div class="{status_class}" 
+             style="text-align:center;
+                    padding:12px 16px;
+                    border-radius:10px;
+                    margin-bottom:18px;">
+            {status_text}
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    # ---- Budget Utilization Gauge ----
+    if PLOTLY_AVAILABLE:
+        gauge = go.Figure(
+            go.Indicator(
+                mode="gauge+number",
+                value=pct_clamped,
+                number={
+                    "suffix": "%",
+                    "valueformat": ".2f",  # 👈 forces 2 decimal display
+                    "font": {"color": "#e2e8f0", "size": 30},
+                },
+                title={
+                    "text": "Budget Utilization",
+                    "font": {"color": MUTED, "size": 14},
+                },
+                gauge={
+                    "axis": {"range": [0, 100], "tickcolor": "#64748b"},
+                    "bar": {"color": ACCENT, "thickness": 0.45},
+                    "bgcolor": "#101827",
+                    "borderwidth": 0,
+                    "steps": [
+                        {"range": [0, 55], "color": "#1f2937"},
+                        {"range": [55, 85], "color": "#1f3650"},
+                        {"range": [85, 100], "color": "#123a35"},
+                    ],
+                },
+                domain={"x": [0.18, 0.82], "y": [0, 1]},  # 👈 better centering
+            )
+        )
+
+        gauge.update_layout(
+            height=240,
+            margin=dict(l=40, r=40, t=50, b=20),
+            paper_bgcolor=PANEL,
+            plot_bgcolor=PANEL,
+        )
+
+        st.plotly_chart(
+            gauge,
+            use_container_width=True,
+            config={"displayModeBar": False},
+        )
+
+    else:
+        st.metric("Budget Utilization", f"{pct_display:.2f}%")
+        st.progress(min(max(pct_clamped / 100.0, 0.0), 1.0))
+
+    # ---- Centered Budget Caption ----
+    st.markdown(
+        f"""
+        <div style="text-align:center;
+                    color:#94a3b8;
+                    font-size:13px;
+                    margin-top:8px;">
+            Allocated: INR {_format_currency(allocated)} 
+            / Budget: INR {_format_currency(budget_limit)}
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
 
 def _styled_table(df: pd.DataFrame) -> pd.io.formats.style.Styler:
     def _stripe(row: pd.Series) -> list[str]:
@@ -360,6 +445,92 @@ def _plot_donut(
         st.bar_chart(fallback_df["value"])
 
 
+def _build_summary_from_selected(selected_df: pd.DataFrame, total_budget: float) -> dict[str, float]:
+    budget_used = float(selected_df["Subsidy_Amount"].sum()) if not selected_df.empty else 0.0
+    score_sum = float(selected_df["Weighted_Impact_Score"].sum()) if not selected_df.empty else 0.0
+    return {
+        "best_score": round(score_sum, 4),
+        "budget_used": round(budget_used, 2),
+        "budget_limit": float(total_budget),
+        "budget_utilization_pct": round((budget_used / total_budget) * 100, 2) if total_budget > 0 else 0.0,
+    }
+
+
+def _apply_rural_guardrail(
+    msme_df: pd.DataFrame,
+    options_df: pd.DataFrame,
+    selected_df: pd.DataFrame,
+    total_budget: float,
+    min_rural_share: float,
+) -> tuple[pd.DataFrame, bool, str]:
+    """
+    Enforce a minimum rural share in selected MSMEs by replacing low-priority non-rural picks.
+    """
+    if selected_df.empty:
+        return selected_df, False, "No selected MSMEs to rebalance."
+
+    rural_ids = set(msme_df[msme_df["Location_Type"] == "Rural"]["MSME_ID"].tolist())
+    adjusted = selected_df.copy().reset_index(drop=True)
+
+    required_rural_count = int(math.ceil(min_rural_share * len(adjusted)))
+    current_rural_count = int(adjusted["MSME_ID"].isin(rural_ids).sum())
+    if current_rural_count >= required_rural_count:
+        return adjusted, True, "Guardrail already satisfied."
+
+    candidates = options_df[
+        options_df["MSME_ID"].isin(rural_ids) & ~options_df["MSME_ID"].isin(adjusted["MSME_ID"])
+    ].copy()
+    if candidates.empty:
+        return adjusted, False, "No eligible rural alternatives available."
+
+    candidates["efficiency"] = (
+        candidates["Weighted_Impact_Score"] / candidates["Subsidy_Amount"].replace(0, 1)
+    )
+    candidates = candidates.sort_values(
+        ["efficiency", "Weighted_Impact_Score"], ascending=[False, False]
+    )
+
+    replaced = 0
+    for _, candidate in candidates.iterrows():
+        current_rural_count = int(adjusted["MSME_ID"].isin(rural_ids).sum())
+        if current_rural_count >= required_rural_count:
+            break
+
+        current_budget = float(adjusted["Subsidy_Amount"].sum())
+        non_rural = adjusted[~adjusted["MSME_ID"].isin(rural_ids)].copy()
+        if non_rural.empty:
+            break
+
+        non_rural["efficiency"] = (
+            non_rural["Weighted_Impact_Score"] / non_rural["Subsidy_Amount"].replace(0, 1)
+        )
+        removable = non_rural.sort_values(
+            ["efficiency", "Weighted_Impact_Score"], ascending=[True, True]
+        )
+
+        target_row = None
+        for _, row in removable.iterrows():
+            next_budget = current_budget - float(row["Subsidy_Amount"]) + float(candidate["Subsidy_Amount"])
+            if next_budget <= total_budget + 1e-6:
+                target_row = row
+                break
+        if target_row is None:
+            continue
+
+        adjusted = adjusted[adjusted["MSME_ID"] != target_row["MSME_ID"]]
+        adjusted = pd.concat([adjusted, pd.DataFrame([candidate])], ignore_index=True)
+        replaced += 1
+
+    final_rural_count = int(adjusted["MSME_ID"].isin(rural_ids).sum())
+    success = final_rural_count >= required_rural_count
+    message = (
+        f"Guardrail {'satisfied' if success else 'partially applied'}: "
+        f"rural selected {final_rural_count}/{len(adjusted)} (target {required_rural_count}). "
+        f"Replacements made: {replaced}."
+    )
+    return adjusted.drop(columns=["efficiency"], errors="ignore"), success, message
+
+
 def main() -> None:
     st.set_page_config(page_title="MSME Dual-Layer Advisory", layout="wide")
     _inject_theme()
@@ -379,6 +550,16 @@ def main() -> None:
         raw_employment_weight = st.slider("Employment Priority Weight", min_value=0.0, max_value=1.0, value=0.4, step=0.05)
         revenue_weight, employment_weight = _normalize_weights(raw_revenue_weight, raw_employment_weight)
         st.caption(f"Effective policy mix: Revenue {revenue_weight:.2f} | Employment {employment_weight:.2f}")
+        st.markdown("#### Fairness Guardrail")
+        enforce_rural_guardrail = st.toggle("Enforce minimum rural share", value=False)
+        min_rural_share_pct = st.slider(
+            "Minimum Rural Share (%)",
+            min_value=0,
+            max_value=60,
+            value=20,
+            step=5,
+            disabled=not enforce_rural_guardrail,
+        )
         if st.button("Clear cached computations", use_container_width=True):
             st.cache_data.clear()
             st.cache_resource.clear()
@@ -405,6 +586,26 @@ def main() -> None:
             total_budget=float(total_budget),
         )
 
+    if enforce_rural_guardrail:
+        with st.spinner("Applying rural fairness guardrail..."):
+            adjusted_selected_df, guardrail_ok, guardrail_msg = _apply_rural_guardrail(
+                msme_df=msme_df,
+                options_df=policy_options_df,
+                selected_df=selected_df,
+                total_budget=float(total_budget),
+                min_rural_share=float(min_rural_share_pct) / 100.0,
+            )
+            selected_df = adjusted_selected_df
+            selected_view, non_selected_df, sector_summary_df, totals = build_decision_views(
+                msme_df=msme_df,
+                options_df=policy_options_df,
+                selected_df=selected_df,
+                no_eligibility_ids=no_eligibility_ids,
+                total_budget=float(total_budget),
+            )
+            optimization_summary = _build_summary_from_selected(selected_df, float(total_budget))
+        st.info(guardrail_msg if guardrail_ok else f"{guardrail_msg} Budget and feasibility constraints preserved.")
+
     _render_section("Platform Snapshot", "Live analytics generated from current scenario controls.")
     m1, m2, m3, m4 = st.columns(4)
     with m1:
@@ -415,6 +616,9 @@ def main() -> None:
         _kpi_card("Model Accuracy", f"{model_artifacts.metrics['accuracy']:.3f}", "Classification validation")
     with m4:
         _kpi_card("Macro F1", f"{model_artifacts.metrics['macro_f1']:.3f}", "Balanced model quality")
+
+    if "saved_scenarios" not in st.session_state:
+        st.session_state["saved_scenarios"] = []
 
     tab1, tab2, tab3 = st.tabs(["Advisory", "Policy Engine", "Transparency"])
 
@@ -483,19 +687,107 @@ def main() -> None:
 
     with tab2:
         _render_section("Policy Engine Module", "Budget-constrained optimization with weighted economic outcomes.")
-        k1, k2, k3, k4, k5 = st.columns(5)
+        subsidy_allocated = float(totals["total_subsidy_allocated"])
+        projected_revenue = float(totals["total_projected_revenue_gain"])
+        projected_jobs = float(totals["total_projected_employment_generation"])
+        roi_ratio = projected_revenue / subsidy_allocated if subsidy_allocated > 0 else 0.0
+        cost_per_job = subsidy_allocated / projected_jobs if projected_jobs > 0 else 0.0
+
+        location_map = msme_df.set_index("MSME_ID")["Location_Type"].to_dict()
+        rural_selected = int(
+            sum(location_map.get(msme_id) == "Rural" for msme_id in selected_view["MSME_ID"].tolist())
+        ) if not selected_view.empty else 0
+        rural_share_pct = (rural_selected / len(selected_view) * 100) if len(selected_view) > 0 else 0.0
+
+        k1, k2, k3, k4 = st.columns(4)
         with k1:
             _kpi_card("Selected MSMEs", str(int(totals["selected_count"])))
         with k2:
-            _kpi_card("Subsidy Allocated", _format_currency(float(totals["total_subsidy_allocated"])))
+            _kpi_card("Subsidy Allocated", _format_currency(subsidy_allocated))
         with k3:
-            _kpi_card("Revenue Gain", _format_currency(float(totals["total_projected_revenue_gain"])))
+            _kpi_card("Revenue Gain", _format_currency(projected_revenue))
         with k4:
-            _kpi_card("Employment Generation", str(int(totals["total_projected_employment_generation"])))
+            _kpi_card("Employment Generation", str(int(projected_jobs)))
+        st.markdown("<div style='height:5px;'></div>", unsafe_allow_html=True)
+
+        k5, k6, k7 = st.columns(3)
         with k5:
             _kpi_card("Budget Utilization", f"{optimization_summary['budget_utilization_pct']:.1f}%")
+        with k6:
+            _kpi_card("ROI (Revenue/Subsidy)", f"{roi_ratio:.2f}x", "Higher is better")
+        with k7:
+            _kpi_card("Cost per Job", _format_currency(cost_per_job), "INR per projected job")
+        st.markdown("<div style='height:5px;'></div>", unsafe_allow_html=True)
 
-        left, right = st.columns([1.1, 1.2], gap="large")
+        st.markdown('<div class="module-box">', unsafe_allow_html=True)
+        _render_section("Scenario Saver + Compare", "Save this run and compare policy outcomes across scenarios.")
+        s1, s2, s3 = st.columns([2.2, 1.0, 1.0])
+        with s1:
+            scenario_name = st.text_input(
+                "Scenario Name",
+                value=f"Scenario {len(st.session_state['saved_scenarios']) + 1}",
+                key="scenario_name_input",
+            )
+        with s2:
+            st.markdown("<div style='height: 1.9rem;'></div>", unsafe_allow_html=True)
+            save_clicked = st.button("Save Scenario", use_container_width=True)
+        with s3:
+            st.markdown("<div style='height: 1.9rem;'></div>", unsafe_allow_html=True)
+            clear_clicked = st.button("Clear Saved", use_container_width=True)
+
+        if save_clicked:
+            st.session_state["saved_scenarios"].append(
+                {
+                    "Saved_At": datetime.now().strftime("%H:%M:%S"),
+                    "Scenario": scenario_name.strip() or f"Scenario {len(st.session_state['saved_scenarios']) + 1}",
+                    "Revenue_Weight": round(revenue_weight, 2),
+                    "Employment_Weight": round(employment_weight, 2),
+                    "Budget": float(total_budget),
+                    "Selected_MSMEs": int(totals["selected_count"]),
+                    "Revenue_Gain": projected_revenue,
+                    "Employment_Gain": int(projected_jobs),
+                    "Subsidy_Allocated": subsidy_allocated,
+                    "ROI_x": round(roi_ratio, 3),
+                    "Cost_per_Job": round(cost_per_job, 2),
+                    "Rural_Share_Pct": round(rural_share_pct, 2),
+                    "Budget_Utilization_Pct": float(optimization_summary["budget_utilization_pct"]),
+                }
+            )
+            st.success("Scenario saved.")
+        if clear_clicked:
+            st.session_state["saved_scenarios"] = []
+            st.warning("Saved scenarios cleared.")
+
+        if st.session_state["saved_scenarios"]:
+            scenario_df = pd.DataFrame(st.session_state["saved_scenarios"])
+            scenario_df_show = scenario_df.copy()
+            scenario_df_show["Budget"] = scenario_df_show["Budget"].map(_format_currency)
+            scenario_df_show["Revenue_Gain"] = scenario_df_show["Revenue_Gain"].map(_format_currency)
+            scenario_df_show["Subsidy_Allocated"] = scenario_df_show["Subsidy_Allocated"].map(_format_currency)
+            scenario_df_show["Cost_per_Job"] = scenario_df_show["Cost_per_Job"].map(_format_currency)
+            st.dataframe(_styled_table(scenario_df_show), use_container_width=True, hide_index=True)
+
+            if PLOTLY_AVAILABLE and len(scenario_df) > 1:
+                compare_fig = px.scatter(
+                    scenario_df,
+                    x="Cost_per_Job",
+                    y="ROI_x",
+                    size="Selected_MSMEs",
+                    color="Scenario",
+                    template="plotly_dark",
+                    title="Scenario Compare: ROI vs Cost-per-Job",
+                    hover_name="Scenario",
+                )
+                compare_fig.update_layout(
+                    paper_bgcolor=PANEL,
+                    plot_bgcolor=PANEL,
+                    font=dict(color="#dbeafe"),
+                    margin=dict(l=10, r=10, t=48, b=10),
+                )
+                st.plotly_chart(compare_fig, use_container_width=True, config={"displayModeBar": False})
+        st.markdown("</div>", unsafe_allow_html=True)
+
+        left, right = st.columns([1.0, 1.0], gap="large")
         with left:
             st.markdown('<div class="module-box">', unsafe_allow_html=True)
             _render_section("Executive Summary", "Decision-grade overview for policy teams.")
