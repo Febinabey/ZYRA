@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime
 import math
+from pathlib import Path
 
 import pandas as pd
 import streamlit as st
@@ -37,6 +38,7 @@ WARN = "#f59e0b"
 SUCCESS = "#22c55e"
 PANEL = "#101827"
 MUTED = "#93a4bd"
+MSME_CSV_PATH = Path("msme_data.csv")
 
 
 @st.cache_data(show_spinner=False)
@@ -155,8 +157,9 @@ def _normalize_weights(revenue_weight: float, employment_weight: float) -> tuple
 def _render_topbar() -> None:
     st.markdown(
         """
+        <div style="height:10px;"></div>
         <div class="topbar">
-            <div class="topbar-title">Zyra MSME Intelligence Platform</div>
+            <div class="topbar-title">FundWise.ai</div>
             <div class="topbar-tag">Predictive Growth Advisory + Budget-Aware Policy Engine</div>
         </div>
         """,
@@ -301,6 +304,37 @@ def _styled_table(df: pd.DataFrame) -> pd.io.formats.style.Styler:
     ]).format(na_rep="-")
 
 
+def _persist_manual_profile_to_csv(manual_profile: dict[str, object]) -> tuple[bool, str]:
+    """
+    Save manual advisory input to msme_data.csv without breaking existing schema.
+    """
+    new_row = pd.DataFrame([manual_profile]).copy()
+    new_row["Growth_Category"] = "Unknown"
+
+    if MSME_CSV_PATH.exists():
+        try:
+            existing_df = pd.read_csv(MSME_CSV_PATH)
+        except Exception as exc:
+            return False, f"Failed to read CSV: {exc}"
+
+        if "MSME_ID" in existing_df.columns:
+            if str(manual_profile["MSME_ID"]) in existing_df["MSME_ID"].astype(str).tolist():
+                return False, f"MSME_ID '{manual_profile['MSME_ID']}' already exists in CSV. Entry not duplicated."
+
+        # Align to existing columns to keep compatibility with current file format.
+        for col in existing_df.columns:
+            if col not in new_row.columns:
+                new_row[col] = ""
+        new_row = new_row[existing_df.columns]
+        updated = pd.concat([existing_df, new_row], ignore_index=True)
+        updated.to_csv(MSME_CSV_PATH, index=False)
+        return True, f"Manual entry saved to {MSME_CSV_PATH.name}."
+
+    # If file doesn't exist, create using current row columns.
+    new_row.to_csv(MSME_CSV_PATH, index=False)
+    return True, f"{MSME_CSV_PATH.name} created and manual entry saved."
+
+
 def _build_manual_profile(default_row: pd.Series, sectors: list[str]) -> dict[str, object]:
     col1, col2, col3 = st.columns(3)
     with col1:
@@ -364,6 +398,11 @@ def _select_profile(msme_df: pd.DataFrame) -> pd.DataFrame | None:
             submitted = st.form_submit_button("Run Advisory", use_container_width=True)
         if submitted:
             profile_df = pd.DataFrame([manual_profile])
+            saved, message = _persist_manual_profile_to_csv(manual_profile)
+            if saved:
+                st.success(message)
+            else:
+                st.warning(message)
 
     st.markdown("</div>", unsafe_allow_html=True)
     return profile_df
@@ -544,7 +583,13 @@ def main() -> None:
         n_entries = st.slider("Synthetic MSME entries", min_value=300, max_value=1200, value=360, step=20)
         random_seed = st.number_input("Random Seed", min_value=0, max_value=9999, value=42, step=1)
         st.markdown("#### Budget")
-        total_budget = st.number_input("Total Subsidy Budget", min_value=1_000_000.0, value=100_000_000.0, step=1_000_000.0)
+        total_budget = st.number_input(
+            "Total Subsidy Budget",
+            min_value=50_000.0,
+            value=25_000_000.0,
+            step=50_000.0,
+            help="Set budget based on your policy scenario. Supports smaller pilots and larger annual plans.",
+        )
         st.markdown("#### Policy Weights")
         raw_revenue_weight = st.slider("Revenue Priority Weight", min_value=0.0, max_value=1.0, value=0.6, step=0.05)
         raw_employment_weight = st.slider("Employment Priority Weight", min_value=0.0, max_value=1.0, value=0.4, step=0.05)
